@@ -144,11 +144,10 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   double ptCut = 0.6;
   if (occ < 20) ptCut = 1.0;
 
-  std::cout<<"centrality = "<<occ/2<<"%"<<"  ptCut = "<<ptCut<<" GeV/c"<<std::endl;
 
   for(TrackCollection::const_iterator tr = genTcol->begin(); tr != genTcol->end(); tr++) {
     if ( tr->pt() < ptCut ) continue;
-    if (tr->pt() < ptCut + 0.2  ) {
+    if (tr->pt() < (ptCut + 0.2)  ) {
 	genEta.push_back(tr->eta());
         genPhi.push_back(tr->phi());
     }
@@ -158,14 +157,12 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   for(TrackCollection::const_iterator tr = pixTcol->begin(); tr != pixTcol->end(); tr++) {//COUNTING MULTIPLICITY
      int nrec=0;
      if (tr->pt() >= ptCut ) continue;
-     if ( tr->pt() > (ptCut - 0.2) && tr->pt() < ptCut ) {
-           std::cout<<"eta1 = "<< tr->eta()<<"  phi1 = "<<tr->phi()<<std::endl;
+     if ( tr->pt() > (ptCut - 0.2) ) {
            int Ngen = genEta.size();
            for(int i=0; i< Ngen; i++){
 
              if (fabs(tr->eta()- genEta[i]) < 0.02 && fabs(tr->phi()- genPhi[i]) < 0.02 ) {
                nrec++;
-               std::cout<<"eta2 = "<< genEta[i]<<"  phi2 = "<<genPhi[i]<<std::endl;
                
              }
 
