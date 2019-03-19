@@ -75,6 +75,8 @@ class generalAndHiPixelTracks : public edm::stream::EDProducer<> {
       edm::EDGetTokenT<reco::VertexCollection> vertexSrc_;
       edm::EDGetTokenT<int> centralitySrc_;
 
+      double cutWidth_;
+      double trkRes_;
       std::string qualityString_;
       double dxyErrMax_;
       double dzErrMax_;
@@ -116,6 +118,8 @@ generalAndHiPixelTracks::generalAndHiPixelTracks(const edm::ParameterSet& iConfi
  pixTrackSrc_(consumes<reco::TrackCollection>(iConfig.getParameter<edm::InputTag>("pixTrackSrc"))),
  vertexSrc_(consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>("vertexSrc"))),
  centralitySrc_(consumes<int>(iConfig.getParameter<edm::InputTag>("centralitySrc"))),
+ cutWidth_(iConfig.getParameter<double>("cutWidth")),
+ trkRes_(iConfig.getParameter<double>("trkRes")),
  qualityString_(iConfig.getParameter<std::string>("qualityString")),
  dxyErrMax_(iConfig.getParameter<double>("dxyErrMax")),
  dzErrMax_(iConfig.getParameter<double>("dzErrMax")),
@@ -180,7 +184,7 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   for(TrackCollection::const_iterator tr = genTcol->begin(); tr != genTcol->end(); tr++) {
     if ( tr->pt() < ptCut ) continue;
     if ( ! passesGeneralTrackCuts(*tr, vsorted) ) continue;
-    if (tr->pt() < (ptCut + 0.2)  ) {
+    if (tr->pt() < (ptCut + cutWidth_)  ) {
 	genEta.push_back(tr->eta());
         genPhi.push_back(tr->phi());
     }
@@ -191,11 +195,11 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
      int nrec=0;
      if (tr->pt() >= ptCut ) continue;
      if ( ! passesPixelTrackCuts(*tr, vsorted) ) continue;
-     if ( tr->pt() > (ptCut - 0.2) ) {
+     if ( tr->pt() > (ptCut - cutWidth_) ) {
            int Ngen = genEta.size();
            for(int i=0; i< Ngen; i++){
 
-             if (fabs(tr->eta()- genEta[i]) < 0.02 && fabs(tr->phi()- genPhi[i]) < 0.02 ) {
+             if (fabs(tr->eta()- genEta[i]) < trkRes_ && fabs(tr->phi()- genPhi[i]) < trkRes_ ) {
                nrec++;
                
              }
