@@ -74,6 +74,7 @@ class generalAndHiPixelTracks : public edm::stream::EDProducer<> {
 
       edm::EDGetTokenT<reco::VertexCollection> vertexSrc_;
       edm::EDGetTokenT<int> centralitySrc_;
+      edm::EDGetTokenT<std::vector<float>> mvaSrc_;
 
       double cutWidth_;
       double trkRes_;
@@ -86,6 +87,7 @@ class generalAndHiPixelTracks : public edm::stream::EDProducer<> {
       double chi2nMaxPixel_;
       double dzErrMaxPixel_;
       double dxyErrMaxPixel_;
+      float trkMva;
 
 //      typedef math::XYZPointD Point;
 //      typedef std::vector<Point> PointCollection;
@@ -118,6 +120,7 @@ generalAndHiPixelTracks::generalAndHiPixelTracks(const edm::ParameterSet& iConfi
  pixTrackSrc_(consumes<reco::TrackCollection>(iConfig.getParameter<edm::InputTag>("pixTrackSrc"))),
  vertexSrc_(consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>("vertexSrc"))),
  centralitySrc_(consumes<int>(iConfig.getParameter<edm::InputTag>("centralitySrc"))),
+ mvaSrc_(consumes<std::vector<float>>(iConfig.getParameter<edm::InputTag>("mvaSrc"))),
  cutWidth_(iConfig.getParameter<double>("cutWidth")),
  trkRes_(iConfig.getParameter<double>("trkRes")),
  qualityString_(iConfig.getParameter<std::string>("qualityString")),
@@ -171,6 +174,10 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   Handle<reco::TrackCollection> pixTcol;
   iEvent.getByToken(pixTrackSrc_, pixTcol);
 
+  edm::Handle<std::vector<float>> mvaoutput;
+  iEvent.getByToken(mvaSrc_, mvaoutput);
+
+
   int occ=10, cbin=0;
   edm::Handle<int> centralityBin;
   iEvent.getByToken(centralitySrc_, centralityBin);
@@ -180,8 +187,10 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   double ptCut = 0.6;
   if (occ < 20) ptCut = 1.0;
 
-
+  int i_tr=-1;
   for(TrackCollection::const_iterator tr = genTcol->begin(); tr != genTcol->end(); tr++) {
+    trkMva = (*mvaoutput)[i_tr]; 
+    i_tr++;
     if ( tr->pt() < ptCut ) continue;
     if ( ! passesGeneralTrackCuts(*tr, vsorted) ) continue;
     if (tr->pt() < (ptCut + cutWidth_)  ) {
@@ -250,7 +259,7 @@ generalAndHiPixelTracks::passesGeneralTrackCuts(const reco::Track & track, const
    double nlayers = track.hitPattern().trackerLayersWithMeasurement();
    chi2n = chi2n/nlayers;
    int nhits = track.numberOfValidHits();
-
+   int algo  = track.algo();
 
 
    if(track.quality(reco::TrackBase::qualityByName(qualityString_)) != 1)
@@ -263,6 +272,8 @@ generalAndHiPixelTracks::passesGeneralTrackCuts(const reco::Track & track, const
 
    if(nhits < nhitsMin_ ) return false;
    if(chi2n > chi2nMax_ ) return false;
+
+   if ( algo == 6 && trkMva < 0.98 ) return false;
 
    return true;
 }
