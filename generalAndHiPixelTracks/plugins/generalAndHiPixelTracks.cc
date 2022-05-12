@@ -40,6 +40,8 @@
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/Math/interface/Point3D.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
+#include "DataFormats/PatCandidates/interface/PackedCandidate.h"
 #include "TVector3.h"
 //#include "FWCore/Framework/interface/MakerMacros.h"
 //#include "FWCore/ServiceRegistry/interface/Service.h"
@@ -65,12 +67,16 @@ class generalAndHiPixelTracks : public edm::stream::EDProducer<> {
       virtual void produce(edm::Event&, const edm::EventSetup&) override;
       virtual void endStream() override;
 
-      bool passesGeneralTrackCuts(const reco::Track & track, const reco::VertexCollection&);
+      bool passesGeneralTrackCuts(const reco::Track & track, const reco::VertexCollection&, double chi2n);
       bool passesPixelTrackCuts(const reco::Track & track, const reco::VertexCollection&);
 
 
       edm::EDGetTokenT<reco::TrackCollection>  genTrackSrc_;
-      edm::EDGetTokenT<reco::TrackCollection>  pixTrackSrc_;
+      //edm::EDGetTokenT<reco::TrackCollection>  pixTrackSrc_;
+      edm::EDGetTokenT<edm::View<pat::PackedCandidate>  > pixTrackSrc_; 
+      edm::EDGetTokenT<edm::View<pat::PackedCandidate>  > srcPFcand_;
+      edm::InputTag chi2MapLabel_;
+      edm::EDGetTokenT<edm::ValueMap<float>> chi2Map_;
 
       edm::EDGetTokenT<reco::VertexCollection> vertexSrc_;
       edm::EDGetTokenT<int> centralitySrc_;
@@ -117,7 +123,11 @@ class generalAndHiPixelTracks : public edm::stream::EDProducer<> {
 //
 generalAndHiPixelTracks::generalAndHiPixelTracks(const edm::ParameterSet& iConfig):
  genTrackSrc_(consumes<reco::TrackCollection>(iConfig.getParameter<edm::InputTag>("genTrackSrc"))),
- pixTrackSrc_(consumes<reco::TrackCollection>(iConfig.getParameter<edm::InputTag>("pixTrackSrc"))),
+ //pixTrackSrc_(consumes<reco::TrackCollection>(iConfig.getParameter<edm::InputTag>("pixTrackSrc"))),
+ pixTrackSrc_(consumes<edm::View<pat::PackedCandidate> >(iConfig.getParameter<edm::InputTag>("pixTrackSrc"))),
+ srcPFcand_(consumes<edm::View<pat::PackedCandidate> >(iConfig.getParameter<edm::InputTag>("srcPFcand"))),
+ chi2MapLabel_(iConfig.getParameter<edm::InputTag>("chi2Map")),
+ chi2Map_(consumes<edm::ValueMap<float>>(chi2MapLabel_)),
  vertexSrc_(consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>("vertexSrc"))),
  centralitySrc_(consumes<int>(iConfig.getParameter<edm::InputTag>("centralitySrc"))),
  mvaSrc_(consumes<std::vector<float>>(iConfig.getParameter<edm::InputTag>("mvaSrc"))),
@@ -171,8 +181,15 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   Handle<reco::TrackCollection> genTcol;
   iEvent.getByToken(genTrackSrc_, genTcol);
 
-  Handle<reco::TrackCollection> pixTcol;
+  //Handle<reco::TrackCollection> pixTcol;
+  edm::Handle<edm::View<pat::PackedCandidate>> pixTcol;
   iEvent.getByToken(pixTrackSrc_, pixTcol);
+
+  edm::Handle<edm::View<pat::PackedCandidate>> pfCandidates;
+  iEvent.getByToken(srcPFcand_,pfCandidates);
+
+  edm::Handle<edm::ValueMap<float>> chi2Map;
+  iEvent.getByToken(chi2Map_,chi2Map);
 
   edm::Handle<std::vector<float>> mvaoutput;
   iEvent.getByToken(mvaSrc_, mvaoutput);
@@ -187,12 +204,18 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
   double ptCut = 0.6;
   if (occ < 20) ptCut = 1.0;
 
-  int i_tr=-1;
-  for(TrackCollection::const_iterator tr = genTcol->begin(); tr != genTcol->end(); tr++) {
-    trkMva = (*mvaoutput)[i_tr]; 
-    i_tr++;
+  //int i_tr=-1;
+  for(unsigned int i = 0, n = pfCandidates->size(); i < n; ++i){
+     const pat::PackedCandidate &pf = (*pfCandidates)[i];
+      if(!(pf.hasTrackDetails()))continue;
+       const reco::Track  &trk = pf.pseudoTrack();
+       const reco::Track * tr = (&trk);
+       //const reco::Track tr = *trk;
+    //trkMva = (*mvaoutput)[i_tr]; 
+    //i_tr++;
     if ( tr->pt() < ptCut ) continue;
-    if ( ! passesGeneralTrackCuts(*tr, vsorted) ) continue;
+    double chi2n=(*chi2Map)[pfCandidates->ptrAt(i)];
+    if ( ! passesGeneralTrackCuts(*tr, vsorted, chi2n) ) continue;
     if (tr->pt() < (ptCut + cutWidth_)  ) {
 	genEta.push_back(tr->eta());
         genPhi.push_back(tr->phi());
@@ -200,7 +223,12 @@ generalAndHiPixelTracks::produce(edm::Event& iEvent, const edm::EventSetup& iSet
     mrgTcol->push_back(*tr);
   } 
 
-  for(TrackCollection::const_iterator tr = pixTcol->begin(); tr != pixTcol->end(); tr++) {
+  for(unsigned int i = 0, n = pixTcol->size(); i < n; ++i){
+     const pat::PackedCandidate &pf = (*pixTcol)[i];
+      if(!(pf.hasTrackDetails()))continue;
+       const reco::Track  &trk = pf.pseudoTrack();
+       const reco::Track * tr = (&trk);
+
      int nrec=0;
      if (tr->pt() >= ptCut ) continue;
      if ( ! passesPixelTrackCuts(*tr, vsorted) ) continue;
@@ -238,7 +266,7 @@ generalAndHiPixelTracks::endStream() {
 }
 
 bool
-generalAndHiPixelTracks::passesGeneralTrackCuts(const reco::Track & track, const reco::VertexCollection & vertex)
+generalAndHiPixelTracks::passesGeneralTrackCuts(const reco::Track & track, const reco::VertexCollection & vertex, double chi2n)
 {
 
    math::XYZPoint vtxPoint(0.0,0.0,0.0);
@@ -255,7 +283,7 @@ generalAndHiPixelTracks::passesGeneralTrackCuts(const reco::Track & track, const
    dxysigma = sqrt(track.d0Error()*track.d0Error()+vxErr*vyErr);
    dzsigma = sqrt(track.dzError()*track.dzError()+vzErr*vzErr);
 
-   double chi2n = track.normalizedChi2();
+   //double chi2n = track.normalizedChi2();
    double nlayers = track.hitPattern().trackerLayersWithMeasurement();
    chi2n = chi2n/nlayers;
    int nhits = track.numberOfValidHits();

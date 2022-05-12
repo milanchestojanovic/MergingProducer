@@ -3,6 +3,7 @@
 <use name="FWCore/ParameterSet"/>
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/Math"/>
+<use   name="DataFormats/PatCandidates"/>
 <flags EDM_PLUGIN="1"/>
 <export>
    <lib name="1"/>
