@@ -1,9 +1,11 @@
 import FWCore.ParameterSet.Config as cms
 
 generalAndHiPixelTracks = cms.EDProducer('generalAndHiPixelTracks',
+  srcPFcand = cms.InputTag("packedPFCandidates"),
+  chi2Map = cms.InputTag("packedPFCandidateTrackChi2"),
   genTrackSrc = cms.InputTag("generalTracks"),
-  pixTrackSrc = cms.InputTag("hiConformalPixelTracks"),
-  vertexSrc = cms.InputTag("offlinePrimaryVertices"),
+  pixTrackSrc = cms.InputTag("hiPixelTracks"),
+  vertexSrc = cms.InputTag("offlineSlimmedPrimaryVerticesRecovery"),
   centralitySrc = cms.InputTag("centralityBin","HFtowers"),
   mvaSrc = cms.InputTag('generalTracks','MVAValues'),
   cutWidth = cms.double(0.2),
